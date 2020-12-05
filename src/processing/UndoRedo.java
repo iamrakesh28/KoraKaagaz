@@ -270,6 +270,14 @@ public class UndoRedo {
             else {
                 retObj = topObj;
                 newObj = topObj;
+
+                // object similar to its previous version
+                BoardObject prevObj = duplicateObject(topObj, topObj.getOperation());
+                prevObj.setPixels(prevObj.getPrevIntensity());
+                
+                // remove previous object
+                ClientBoardState.maps.removeObjectFromMaps(prevObj.getObjectId());
+                
                 // update the maps
                 ClientBoardState.maps.insertObjectIntoMaps(newObj);
             }
@@ -294,6 +302,14 @@ public class UndoRedo {
             else {
                 retObj = topObj;
                 newObj = topObj;
+
+                // object similar to its previous version
+                BoardObject prevObj = duplicateObject(topObj, topObj.getOperation());
+                prevObj.setPixels(prevObj.getPrevIntensity());
+                
+                // remove previous object
+                ClientBoardState.maps.removeObjectFromMaps(prevObj.getObjectId());
+                
                 // update the maps
                 ClientBoardState.maps.insertObjectIntoMaps(newObj);
             }
