@@ -214,7 +214,8 @@ public class UndoRedo {
     	
         // Gets the top object from the stack
         BoardObject topObj =  curStack.get(curStack.size() - 1);
-    	
+        // object not to be pushed during the operation
+        curObjId = topObj.getObjectId();
         // Gets the operation performed on that object
         BoardObjectOperationType operationType = topObj.getOperation().getOperationType();
         // Object to be returned for sending over the network
@@ -328,6 +329,9 @@ public class UndoRedo {
         // Transfers the object from one stack to other
         addIntoStack(otherStack, topObj);
         curStack.remove(curStack.size() - 1);
+
+        // undo-redo is done, the object can be pushed into stack
+        curObjId = null;
         /** 
          *  Send the modified pixels to the UI 
          *  null value occurs when delete operation is performed 
