@@ -17,9 +17,8 @@ public class UndoRedo {
 	
     // gets the logger instance
     private static ILogger logger = LoggerFactory.getLoggerInstance();
-
     // stores the object's id on which undo-redo operation is being performed
-    private static ObjectId curObjId = null;
+    private static ObjectId currentObj = null;
     /** 
      *  maximum stack size 
      *  restricts the maximum undo-redo operations
@@ -89,8 +88,10 @@ public class UndoRedo {
 		
         //sets the operation in the created object
         newObj.setOperation(newOp);
+        newObj.setPrevIntensity(obj.getPrevIntensity());
         return newObj;
     }
+
 	
     /**
      * This helper method creates the object
@@ -200,7 +201,7 @@ public class UndoRedo {
                                             ArrayList <BoardObject> otherStack,
                                             Operation operation
                                             ) {
-		
+
         // No undo or redo operation possible
         if (curStack.size() <= 0) {
             logger.log(
@@ -214,8 +215,7 @@ public class UndoRedo {
     	
         // Gets the top object from the stack
         BoardObject topObj =  curStack.get(curStack.size() - 1);
-        // object not to be pushed during the operation
-        curObjId = topObj.getObjectId();
+        currentObj = topObj.getObjectId();
         // Gets the operation performed on that object
         BoardObjectOperationType operationType = topObj.getOperation().getOperationType();
         // Object to be returned for sending over the network
@@ -257,33 +257,24 @@ public class UndoRedo {
             Angle newAngle = null;
             /** 
              *  For undo, the object should be rotated -angle CCW
-             *  For redo, the original rotated object should be created (because the 
-             *  original object was pushed into redo stack when undo was called and 
-             *  putting the back the original object will bring the required changes)
+             *  For redo, the object should be rotated angle CCW
              */
             if (operation == Operation.UNDO) {
                 newAngle = new Angle(-angleCCW.angle);
-                newOp = new RotateOperation(newAngle);
-
-                retObj = duplicateObject(topObj, newOp);
-                newObj = rotateOperation(topObj, newAngle);
             }
             else {
-                newObj = topObj;
-
-                // object similar to its previous version (undo version)
-                BoardObject prevObj = duplicateObject(topObj, topObj.getOperation());
-                prevObj.setPixels(prevObj.getPrevIntensity());
-                prevObj.setPrevIntensity(topObj.getPixels());
-                
-                // remove previous object
-                ClientBoardState.maps.removeObjectFromMaps(prevObj.getObjectId());
-
-                // return object same as previous object
-                retObj = prevObj;
-                // update the maps
-                ClientBoardState.maps.insertObjectIntoMaps(newObj);
+                newAngle = new Angle(-angleCCW.angle);
             }
+            logger.log(
+                       ModuleID.PROCESSING, 
+                       LogLevel.ERROR, 
+                       "[#" + Thread.currentThread().getId() + "] "
+                       + "debugger : Undefined Operation type : " + newAngle.angle
+                       ); 
+            newOp = new RotateOperation(newAngle);
+            // return object has the operation to be performed by other clients
+            retObj = duplicateObject(topObj, newOp);
+            newObj = rotateOperation(topObj, newAngle);
             break;
     					   
         case COLOR_CHANGE :	
@@ -331,11 +322,12 @@ public class UndoRedo {
         }
     	
         // Transfers the object from one stack to other
-        addIntoStack(otherStack, topObj);
-        curStack.remove(curStack.size() - 1);
+        if(operationType.equals(BoardObjectOperationType.ROTATE))
+            addIntoStack(otherStack, newObj);
+        else 
+            addIntoStack(otherStack, topObj);
 
-        // undo-redo is done, the object can be pushed into stack
-        curObjId = null;
+        curStack.remove(curStack.size() - 1);
         /** 
          *  Send the modified pixels to the UI 
          *  null value occurs when delete operation is performed 
@@ -346,14 +338,26 @@ public class UndoRedo {
         else {
             CommunicateChange.provideChanges(topObj.getPixels(), null);
         }
-        logger.log(
-                   ModuleID.PROCESSING, 
-                   LogLevel.SUCCESS, 
-                   "[#" + Thread.currentThread().getId() + "] "
-                   + "Undo / Redo successfully performed"
-                   ); 
+        if (operation == Operation.UNDO) {
+            logger.log(
+                       ModuleID.PROCESSING, 
+                       LogLevel.SUCCESS, 
+                       "[#" + Thread.currentThread().getId() + "] "
+                       + "Undo successfully performed"
+                       ); 
+        } else {
+            logger.log(
+                       ModuleID.PROCESSING, 
+                       LogLevel.SUCCESS, 
+                       "[#" + Thread.currentThread().getId() + "] "
+                       + "Redo successfully performed"
+                       );
+        }
+        currentObj = null;
+
         return retObj;
     }
+
 	
     /**
      * This method deletes the object from the stack using object id
@@ -414,25 +418,19 @@ public class UndoRedo {
         if (object.getUserId().equals(ClientBoardState.userId) == false) {
             return;
         }
-
-        /* if the object being pushed is created during undo-redo processs
-         * then do not push it
-         */
-        if (curObjId != null && curObjId.equals(object.getObjectId())) {
+        if(currentObj!=null && currentObj.equals(object.getObjectId()))
             return;
-        }
-
         // pushes into undo stack
         addIntoStack(ClientBoardState.undoStack, object);
 		
         // clear the redo stack to maintain consistency
         ClientBoardState.redoStack.clear();
-		
+
         logger.log(
                    ModuleID.PROCESSING, 
                    LogLevel.SUCCESS, 
                    "[#" + Thread.currentThread().getId() + "] "
-                   + "Object pushed into the Undo stack"
+                   + "Object pushed into the Undo stack1"
                    );
 	   
         /** 
